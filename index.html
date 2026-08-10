@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3DLabX Smart Lamp</title>
+<style>
+  :root{
+    --bg:#0a0e17; --panel:#131826; --panel-border:#232a3d; --text:#e8ecf5; --muted:#8992a9;
+    --accent-blue:#3b82f6; --accent-green:#22c55e; --accent-red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:radial-gradient(circle at 50% 0%, #131a2c 0%, #0a0e17 55%);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;padding:20px;}
+  .wrap{max-width:1040px;margin:0 auto;}
+  h1.title{text-align:center;font-size:32px;font-weight:800;letter-spacing:1px;
+    background:linear-gradient(90deg,#c026d3,#8b5cf6,#3b82f6,#f97316);
+    -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:4px;}
+  .subtitle{text-align:center;color:var(--muted);font-size:14px;margin-bottom:28px;}
+  .panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:16px;padding:20px;}
+  .panel-title{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:15px;margin-bottom:16px;}
+  .hidden{display:none;}
+  .center-col{max-width:380px;margin:60px auto;}
+  input,button{font-family:inherit;font-size:14px;}
+  input[type=text],input[type=email],input[type=password]{
+    width:100%;background:#0d1220;border:1px solid var(--panel-border);color:var(--text);
+    border-radius:8px;padding:11px 12px;margin-bottom:12px;}
+  .btn{width:100%;padding:12px;border-radius:8px;border:none;background:var(--accent-blue);color:#fff;
+    font-weight:700;cursor:pointer;margin-top:4px;}
+  .btn.secondary{background:#1a2032;color:var(--text);border:1px solid var(--panel-border);}
+  .btn.danger{background:var(--accent-red);}
+  .link-row{text-align:center;margin-top:14px;color:var(--muted);font-size:13.5px;}
+  .link-row a{color:#5ab0ff;cursor:pointer;text-decoration:none;}
+  .error{color:#f87171;font-size:13.5px;margin-bottom:10px;min-height:18px;}
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+  .device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px;}
+  .device-card{background:#0d1220;border:1px solid var(--panel-border);border-radius:14px;padding:18px;cursor:pointer;}
+  .device-card:hover{border-color:#3a4358;}
+  .device-name{font-weight:700;font-size:15.5px;margin-bottom:4px;}
+  .device-id{color:var(--muted);font-size:12px;font-family:monospace;margin-bottom:10px;}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:20px;}
+  .badge.online{background:rgba(34,197,94,0.12);color:#4ade80;border:1px solid rgba(34,197,94,0.3);}
+  .badge.offline{background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3);}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--panel-border);
+    border-radius:14px;color:var(--muted);cursor:pointer;min-height:100px;font-weight:600;}
+  .add-card:hover{border-color:#3a4358;color:var(--text);}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal{background:var(--panel);border:1px solid var(--panel-border);border-radius:16px;padding:24px;width:90%;max-width:380px;}
+
+  .back-link{color:var(--muted);cursor:pointer;font-size:14px;margin-bottom:16px;display:inline-block;}
+  .back-link:hover{color:var(--text);}
+
+  .row1{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:16px;margin-bottom:16px;}
+  @media(max-width:800px){.row1{grid-template-columns:1fr;}}
+  .power-btn{width:100%;padding:14px;border-radius:10px;border:none;font-size:15px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:10px;}
+  .power-on{background:var(--accent-green);color:#08210f;}
+  .power-off{background:#1a2032;color:var(--muted);border:1px solid var(--panel-border);}
+  .power-on.inactive{opacity:.35;}
+  .power-off.active{background:var(--accent-red);color:#fff;border:none;}
+  .led-preview-box{display:flex;flex-direction:column;align-items:center;}
+  #ledCanvas{border-radius:50%;filter:drop-shadow(0 0 30px rgba(139,92,246,0.35));}
+  .brightness-value{font-size:34px;font-weight:800;color:#5ab0ff;margin:6px 0 14px;}
+  input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:4px;
+    background:linear-gradient(90deg,#3b82f6 var(--fill,50%),#232a3d var(--fill,50%));outline:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:#fff;border:3px solid #3b82f6;cursor:pointer;box-shadow:0 0 8px rgba(0,0,0,0.4);}
+  .range-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:8px;}
+  .row2{display:grid;grid-template-columns:1fr 1.6fr;gap:16px;margin-bottom:16px;}
+  @media(max-width:800px){.row2{grid-template-columns:1fr;}}
+  .wheel-wrap{position:relative;width:220px;height:220px;margin:10px auto;}
+  #colorWheel{border-radius:50%;cursor:crosshair;}
+  #wheelCursor{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;
+    box-shadow:0 0 4px rgba(0,0,0,0.6);transform:translate(-50%,-50%);pointer-events:none;}
+  .hex-row{display:flex;gap:10px;margin-top:14px;}
+  .hex-input{flex:1;background:#0d1220;border:1px solid var(--panel-border);color:var(--text);
+    border-radius:8px;padding:10px 12px;font-size:14px;font-family:monospace;}
+  .hex-swatch{width:42px;border-radius:8px;border:1px solid var(--panel-border);}
+  .mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .mode-btn{background:#0d1220;border:1px solid var(--panel-border);color:var(--text);border-radius:10px;
+    padding:14px 8px;font-size:13.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;
+    gap:6px;cursor:pointer;text-align:center;line-height:1.2;}
+  .mode-btn.active{border-color:var(--accent-blue);background:rgba(59,130,246,0.12);}
+  .mode-btn .em{font-size:18px;}
+  .preset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  @media(max-width:700px){.preset-grid{grid-template-columns:repeat(3,1fr);}}
+  .preset-card{background:#0d1220;border:1px solid var(--panel-border);border-radius:12px;padding:16px 8px;
+    display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
+  .preset-swatch{width:44px;height:44px;border-radius:50%;}
+  .preset-name{font-size:12.5px;color:var(--muted);text-align:center;}
+  .section-gap{margin-bottom:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ AUTH VIEW ============ -->
+  <div id="authView">
+    <h1 class="title">3DLABX SMART LAMP</h1>
+    <p class="subtitle">Sign in to control your lamps from anywhere</p>
+    <div class="panel center-col">
+      <div class="panel-title" id="authTitle">Log in</div>
+      <div class="error" id="authError"></div>
+      <input type="email" id="authEmail" placeholder="Email">
+      <input type="password" id="authPassword" placeholder="Password (min 8 characters)">
+      <button class="btn" id="authSubmit">Log in</button>
+      <div class="link-row"><span id="authToggleText">Don't have an account? <a id="authToggle">Sign up</a></span></div>
+    </div>
+  </div>
+
+  <!-- ============ DEVICE LIST VIEW ============ -->
+  <div id="listView" class="hidden">
+    <div class="topbar">
+      <h1 class="title" style="margin:0;font-size:26px;">MY DEVICES</h1>
+      <button class="btn secondary" style="width:auto;padding:8px 16px;" id="logoutBtn">Log out</button>
+    </div>
+    <div class="device-grid" id="deviceGrid"></div>
+    <div class="device-grid" style="grid-template-columns:1fr;margin-top:14px;">
+      <div class="add-card" id="addDeviceCard">+ Add device</div>
+    </div>
+  </div>
+
+  <!-- ============ ADD DEVICE MODAL ============ -->
+  <div id="addModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="panel-title">Add a lamp</div>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+        Enter the Device ID and claim token from the QR label on the bottom of the lamp.
+      </p>
+      <div class="error" id="claimError"></div>
+      <input type="text" id="claimDeviceId" placeholder="Device ID, e.g. 3DLX-A84C21">
+      <input type="text" id="claimToken" placeholder="Claim token">
+      <input type="text" id="claimName" placeholder="Name it, e.g. Bedroom Lamp">
+      <button class="btn" id="claimSubmit">Add lamp</button>
+      <button class="btn secondary" id="claimCancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ============ CONTROL VIEW ============ -->
+  <div id="controlView" class="hidden">
+    <span class="back-link" id="backToList">&larr; My devices</span>
+    <h1 class="title" id="controlDeviceName">LAMP</h1>
+    <p class="subtitle"><span class="badge" id="controlBadge"><span class="dot"></span><span id="controlBadgeText">Offline</span></span></p>
+
+    <div class="row1">
+      <div class="panel">
+        <div class="panel-title">Power</div>
+        <button id="btnOn" class="power-btn power-on inactive">&#9211; ON</button>
+        <button id="btnOff" class="power-btn power-off active">&#9211; OFF</button>
+      </div>
+      <div class="panel led-preview-box">
+        <div class="panel-title" style="width:100%;justify-content:center;">LED Preview</div>
+        <canvas id="ledCanvas" width="220" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Brightness</div>
+        <div class="brightness-value" id="brightnessValue">75%</div>
+        <input type="range" id="brightnessSlider" min="0" max="100" value="75">
+        <div class="range-labels"><span>0%</span><span>100%</span></div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="panel">
+        <div class="panel-title">Color Picker</div>
+        <div class="wheel-wrap">
+          <canvas id="colorWheel" width="220" height="220"></canvas>
+          <div id="wheelCursor"></div>
+        </div>
+        <div class="hex-row">
+          <input id="hexInput" class="hex-input" type="text" value="#9C27B0">
+          <input id="hexSwatch" class="hex-swatch" type="color" value="#9C27B0">
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Mode</div>
+        <div class="mode-grid" id="modeGrid">
+          <button class="mode-btn active" data-mode="static"><span class="em">🎨</span>Static</button>
+          <button class="mode-btn" data-mode="rainbow"><span class="em">🌈</span>Rainbow</button>
+          <button class="mode-btn" data-mode="breathing"><span class="em">〰</span>Breathing</button>
+          <button class="mode-btn" data-mode="blink"><span class="em">✨</span>Blink</button>
+          <button class="mode-btn" data-mode="chase"><span class="em">🔵</span>Theater Chase</button>
+          <button class="mode-btn" data-mode="fire"><span class="em">🔥</span>Fire</button>
+          <button class="mode-btn" data-mode="police"><span class="em">🚨</span>Police</button>
+          <button class="mode-btn" data-mode="candle"><span class="em">🕯</span>Candle</button>
+          <button class="mode-btn" data-mode="music"><span class="em">🎵</span>Music</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel section-gap">
+      <div class="panel-title">Speed</div>
+      <input type="range" id="speedSlider" min="1" max="100" value="50">
+      <div class="range-labels"><span>Slow</span><span>Fast</span></div>
+    </div>
+
+    <div class="panel section-gap">
+      <div class="panel-title">Presets</div>
+      <div class="preset-grid" id="presetGrid">
+        <div class="preset-card" data-color="#f6b83c" data-name="Living Room"><div class="preset-swatch" style="background:#f6b83c"></div><div class="preset-name">Living Room</div></div>
+        <div class="preset-card" data-color="#2563eb" data-name="Gaming"><div class="preset-swatch" style="background:#2563eb"></div><div class="preset-name">Gaming</div></div>
+        <div class="preset-card" data-color="#9c27b0" data-name="Night"><div class="preset-swatch" style="background:#9c27b0"></div><div class="preset-name">Night</div></div>
+        <div class="preset-card" data-color="#ef4444" data-name="Movie"><div class="preset-swatch" style="background:#ef4444"></div><div class="preset-name">Movie</div></div>
+        <div class="preset-card" data-color="#22d3ee" data-name="Work"><div class="preset-swatch" style="background:#22d3ee"></div><div class="preset-name">Work</div></div>
+      </div>
+    </div>
+
+    <button class="btn danger" style="max-width:200px;margin:0 auto;display:block;" id="removeDeviceBtn">Remove this lamp</button>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:13px;margin-top:28px;">Made with ♥ — 3DLabX</div>
+</div>
+
+<script type="module">
+/* ===================== FIREBASE SETUP ===================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getDatabase, ref, get, set, update, remove, onValue, off
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// PASTE YOUR firebaseConfig HERE (see FIREBASE_SETUP.md, Step 4)
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBfJzAPxQCu7zrPfXXhsN8qzocCjLb7szo",
+  authDomain: "rgb-led-c4f12.firebaseapp.com",
+  databaseURL: "https://rgb-led-c4f12-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rgb-led-c4f12",
+  storageBucket: "rgb-led-c4f12.firebasestorage.app",
+  messagingSenderId: "281843870809",
+  appId: "1:281843870809:web:168026f1975240bc0e1548"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+/* ===================== VIEW SWITCHING ===================== */
+const authView = document.getElementById('authView');
+const listView = document.getElementById('listView');
+const controlView = document.getElementById('controlView');
+function showView(v){ [authView, listView, controlView].forEach(el => el.classList.add('hidden')); v.classList.remove('hidden'); }
+
+/* ===================== AUTH VIEW ===================== */
+let authMode = 'login';
+const authTitle = document.getElementById('authTitle');
+const authSubmit = document.getElementById('authSubmit');
+const authToggle = document.getElementById('authToggle');
+const authToggleText = document.getElementById('authToggleText');
+const authError = document.getElementById('authError');
+
+function bindToggle(){
+  document.getElementById('authToggle').onclick = () => {
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    authTitle.textContent = authMode === 'login' ? 'Log in' : 'Sign up';
+    authSubmit.textContent = authMode === 'login' ? 'Log in' : 'Create account';
+    authToggleText.innerHTML = authMode === 'login'
+      ? 'Don\'t have an account? <a id="authToggle">Sign up</a>'
+      : 'Already have an account? <a id="authToggle">Log in</a>';
+    authError.textContent = '';
+    bindToggle();
+  };
+}
+bindToggle();
+
+authSubmit.onclick = async () => {
+  authError.textContent = '';
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  try{
+    if(authMode === 'login') await signInWithEmailAndPassword(auth, email, password);
+    else await createUserWithEmailAndPassword(auth, email, password);
+  }catch(e){
+    authError.textContent = friendlyAuthError(e.code);
+  }
+};
+function friendlyAuthError(code){
+  const map = {
+    'auth/email-already-in-use': 'An account with that email already exists.',
+    'auth/invalid-email': 'That email address looks invalid.',
+    'auth/weak-password': 'Password should be at least 6 characters.',
+    'auth/invalid-credential': 'Incorrect email or password.',
+    'auth/user-not-found': 'Incorrect email or password.',
+    'auth/wrong-password': 'Incorrect email or password.'
+  };
+  return map[code] || 'Something went wrong, please try again.';
+}
+
+document.getElementById('logoutBtn').onclick = () => signOut(auth);
+
+/* ===================== DEVICE LIST ===================== */
+let currentUser = null;
+let devices = {}; // deviceId -> {name, meta, state, online}
+const deviceGrid = document.getElementById('deviceGrid');
+let myDevicesListener = null;
+
+onAuthStateChanged(auth, (user) => {
+  currentUser = user;
+  if (user) {
+    watchMyDevices(user.uid);
+    showView(listView);
+  } else {
+    if (myDevicesListener) { off(myDevicesListener.ref, 'value', myDevicesListener.cb); myDevicesListener = null; }
+    devices = {};
+    showView(authView);
+  }
+});
+
+function watchMyDevices(uid){
+  const idxRef = ref(db, `users/${uid}/devices`);
+  const cb = async (snap) => {
+    const ids = snap.exists() ? Object.keys(snap.val()) : [];
+    devices = {};
+    await Promise.all(ids.map(async (id) => {
+      const metaSnap = await get(ref(db, `devices/${id}/meta`));
+      const stateSnap = await get(ref(db, `devices/${id}/state`));
+      const meta = metaSnap.val() || {};
+      const state = stateSnap.val() || {};
+      const online = meta.lastSeen ? (Date.now() - meta.lastSeen < 90000) : false;
+      devices[id] = { name: meta.name || id, meta, state, online };
+    }));
+    renderDeviceGrid();
+    if (activeDeviceId && devices[activeDeviceId]) applyLiveDeviceUpdate(activeDeviceId);
+  };
+  onValue(idxRef, cb);
+  myDevicesListener = { ref: idxRef, cb };
+}
+
+function renderDeviceGrid(){
+  deviceGrid.innerHTML = '';
+  Object.entries(devices).forEach(([id, d]) => {
+    const card = document.createElement('div');
+    card.className = 'device-card';
+    card.innerHTML = `
+      <div class="device-name">${escapeHtml(d.name)}</div>
+      <div class="device-id">${escapeHtml(id)}</div>
+      <span class="badge ${d.online ? 'online' : 'offline'}"><span class="dot"></span>${d.online ? 'Online' : 'Offline'}</span>
+    `;
+    card.onclick = () => openControl(id);
+    deviceGrid.appendChild(card);
+  });
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ===================== ADD DEVICE (claim) ===================== */
+const addModal = document.getElementById('addModal');
+document.getElementById('addDeviceCard').onclick = () => addModal.classList.remove('hidden');
+document.getElementById('claimCancel').onclick = () => addModal.classList.add('hidden');
+document.getElementById('claimSubmit').onclick = async () => {
+  const claimError = document.getElementById('claimError');
+  claimError.textContent = '';
+  const deviceId = document.getElementById('claimDeviceId').value.trim();
+  const token = document.getElementById('claimToken').value.trim();
+  const name = document.getElementById('claimName').value.trim() || deviceId;
+  if (!deviceId || !token) { claimError.textContent = 'Device ID and claim token are required.'; return; }
+
+  try{
+    // Single multi-path update: rules validate claimCheck against the stored claimToken
+    // and only allow ownerUid to be set if they match (see database.rules.json).
+    await update(ref(db), {
+      [`devices/${deviceId}/ownerUid`]: currentUser.uid,
+      [`devices/${deviceId}/claimCheck`]: token,
+      [`devices/${deviceId}/meta/name`]: name,
+      [`users/${currentUser.uid}/devices/${deviceId}`]: true
+    });
+    addModal.classList.add('hidden');
+    document.getElementById('claimDeviceId').value = '';
+    document.getElementById('claimToken').value = '';
+    document.getElementById('claimName').value = '';
+  }catch(e){
+    claimError.textContent = 'Could not add this lamp — check the Device ID and token are correct, and that the lamp has connected to the internet at least once.';
+  }
+};
+
+/* ===================== CONTROL VIEW ===================== */
+let activeDeviceId = null;
+let sendTimer = null;
+let state = { power:false, brightness:75, color:'#9C27B0', mode:'static', speed:50 };
+
+document.getElementById('backToList').onclick = () => { activeDeviceId = null; showView(listView); };
+
+function openControl(deviceId){
+  activeDeviceId = deviceId;
+  applyLiveDeviceUpdate(deviceId);
+  showView(controlView);
+}
+
+function applyLiveDeviceUpdate(deviceId){
+  const d = devices[deviceId];
+  if (!d) return;
+  document.getElementById('controlDeviceName').textContent = (d.name || deviceId).toUpperCase();
+  state = {
+    power: !!d.state.power,
+    brightness: d.state.brightness ?? 75,
+    color: d.state.color || '#9C27B0',
+    mode: d.state.mode || 'static',
+    speed: d.state.speed ?? 50
+  };
+  if (controlView.classList.contains('hidden') === false) syncUIFromState(d.online);
+}
+
+function pushCommand(partial, immediate){
+  Object.assign(state, partial);
+  clearTimeout(sendTimer);
+  const send = async () => {
+    try{
+      await update(ref(db, `devices/${activeDeviceId}/command`), Object.assign({}, partial, { ts: Date.now() }));
+    }catch(e){ /* surfaced via offline badge */ }
+  };
+  if (immediate) send(); else sendTimer = setTimeout(send, 150);
+}
+
+document.getElementById('removeDeviceBtn').onclick = async () => {
+  if (!confirm('Remove this lamp from your account? You can re-add it later with its QR code.')) return;
+  try{
+    await remove(ref(db, `users/${currentUser.uid}/devices/${activeDeviceId}`));
+    activeDeviceId = null;
+    showView(listView);
+  }catch(e){ alert('Could not remove this lamp: ' + e.message); }
+};
+
+/* ---- power ---- */
+const btnOn = document.getElementById('btnOn'), btnOff = document.getElementById('btnOff');
+function setPower(on){
+  btnOn.classList.toggle('inactive', !on);
+  btnOff.classList.toggle('active', !on);
+  pushCommand({power:on}, true);
+  drawPreview();
+}
+btnOn.onclick = () => setPower(true);
+btnOff.onclick = () => setPower(false);
+
+/* ---- brightness ---- */
+const brightnessSlider = document.getElementById('brightnessSlider');
+const brightnessValue = document.getElementById('brightnessValue');
+brightnessSlider.oninput = () => {
+  const v = +brightnessSlider.value;
+  brightnessValue.textContent = v + '%';
+  brightnessSlider.style.setProperty('--fill', v + '%');
+  pushCommand({brightness:v}, false);
+};
+
+/* ---- speed ---- */
+const speedSlider = document.getElementById('speedSlider');
+speedSlider.oninput = () => {
+  const v = +speedSlider.value;
+  speedSlider.style.setProperty('--fill', v + '%');
+  pushCommand({speed:v}, false);
+};
+
+/* ---- color wheel ---- */
+const wheelCanvas = document.getElementById('colorWheel');
+const wctx = wheelCanvas.getContext('2d');
+const wheelCursor = document.getElementById('wheelCursor');
+const hexInput = document.getElementById('hexInput');
+const hexSwatch = document.getElementById('hexSwatch');
+const R=110, CX=110, CY=110;
+function hsvToRgb(h,s,v){
+  const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c; let r,g,b;
+  if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}else if(h<180){r=0;g=c;b=x;}
+  else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+  return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
+}
+function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();}
+function drawWheel(){
+  const img = wctx.createImageData(220,220);
+  for(let y=0;y<220;y++) for(let x=0;x<220;x++){
+    const dx=x-CX, dy=y-CY, dist=Math.sqrt(dx*dx+dy*dy), idx=(y*220+x)*4;
+    if(dist<=R){
+      let angle=Math.atan2(dy,dx)*180/Math.PI; if(angle<0)angle+=360;
+      const sat=Math.min(dist/R,1); const [r,g,b]=hsvToRgb(angle,sat,1);
+      img.data[idx]=r; img.data[idx+1]=g; img.data[idx+2]=b; img.data[idx+3]=255;
+    } else img.data[idx+3]=0;
+  }
+  wctx.putImageData(img,0,0);
+}
+drawWheel();
+let dragging=false;
+function pickAt(clientX, clientY){
+  const rect = wheelCanvas.getBoundingClientRect();
+  const x=clientX-rect.left, y=clientY-rect.top, dx=x-CX, dy=y-CY;
+  let dist=Math.sqrt(dx*dx+dy*dy); if(dist>R) dist=R;
+  let angle=Math.atan2(dy,dx)*180/Math.PI; if(angle<0) angle+=360;
+  const sat=dist/R; const [r,g,b]=hsvToRgb(angle,sat,1); const hex=rgbToHex(r,g,b);
+  hexInput.value=hex; hexSwatch.value=hex;
+  const cx=CX+Math.cos(angle*Math.PI/180)*dist, cy=CY+Math.sin(angle*Math.PI/180)*dist;
+  wheelCursor.style.left=cx+'px'; wheelCursor.style.top=cy+'px';
+  pushCommand({color:hex}, false);
+  drawPreview();
+}
+wheelCanvas.addEventListener('mousedown', e=>{dragging=true; pickAt(e.clientX,e.clientY);});
+window.addEventListener('mousemove', e=>{if(dragging) pickAt(e.clientX,e.clientY);});
+window.addEventListener('mouseup', ()=>dragging=false);
+wheelCanvas.addEventListener('touchstart', e=>{dragging=true; pickAt(e.touches[0].clientX,e.touches[0].clientY);});
+wheelCanvas.addEventListener('touchmove', e=>{pickAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault();},{passive:false});
+window.addEventListener('touchend', ()=>dragging=false);
+hexInput.addEventListener('change', ()=>{
+  let v=hexInput.value.trim(); if(!v.startsWith('#')) v='#'+v;
+  if(/^#[0-9A-Fa-f]{6}$/.test(v)){ hexSwatch.value=v; pushCommand({color:v.toUpperCase()}, true); drawPreview(); }
+});
+hexSwatch.addEventListener('input', ()=>{
+  hexInput.value=hexSwatch.value.toUpperCase();
+  pushCommand({color:hexSwatch.value.toUpperCase()}, false); drawPreview();
+});
+
+/* ---- mode ---- */
+const modeGrid = document.getElementById('modeGrid');
+modeGrid.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.onclick = () => {
+    modeGrid.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    pushCommand({mode: btn.dataset.mode}, true);
+  };
+});
+
+/* ---- presets ---- */
+document.getElementById('presetGrid').querySelectorAll('.preset-card').forEach(card=>{
+  card.onclick = () => {
+    const color = card.dataset.color.toUpperCase();
+    hexInput.value = color; hexSwatch.value = color;
+    modeGrid.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    modeGrid.querySelector('[data-mode="static"]').classList.add('active');
+    btnOn.classList.remove('inactive'); btnOff.classList.remove('active');
+    pushCommand({power:true, mode:'static', color}, true);
+    drawPreview();
+  };
+});
+
+/* ---- LED preview ---- */
+const previewCanvas = document.getElementById('ledCanvas');
+const pctx = previewCanvas.getContext('2d');
+let previewTick = 0;
+function shade(hex, pct){
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)+pct,g=((n>>8)&0xff)+pct,b=(n&0xff)+pct;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function drawPreview(){
+  const w=220,h=220,cx=110,cy=110,r=100;
+  pctx.clearRect(0,0,w,h);
+  const on = !btnOn.classList.contains('inactive');
+  const color = hexInput.value;
+  const mode = modeGrid.querySelector('.mode-btn.active').dataset.mode;
+  if(!on){ pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle='#12172a';pctx.fill();
+    pctx.strokeStyle='#232a3d';pctx.lineWidth=2;pctx.stroke(); return; }
+  if(mode==='rainbow' && pctx.createConicGradient){
+    const grad=pctx.createConicGradient(previewTick*0.05,cx,cy);
+    ['#ff0000','#ff8800','#ffee00','#00ff55','#00b7ff','#7000ff','#ff00aa','#ff0000'].forEach((c,i,a)=>grad.addColorStop(i/(a.length-1),c));
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=grad;pctx.fill();
+  } else if(mode==='breathing'){
+    const pulse=(Math.sin(previewTick*0.05)+1)/2;
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=color;pctx.globalAlpha=0.35+pulse*0.65;pctx.fill();pctx.globalAlpha=1;
+  } else if(mode==='blink'){
+    const onBlink=Math.floor(previewTick/15)%2===0;
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=onBlink?color:'#12172a';pctx.fill();
+  } else if(mode==='fire'){
+    const flick=0.6+Math.random()*0.4;
+    const grad=pctx.createRadialGradient(cx,cy,10,cx,cy,r);
+    grad.addColorStop(0,`rgba(255,220,80,${flick})`);grad.addColorStop(0.5,`rgba(255,120,20,${flick})`);grad.addColorStop(1,'rgba(180,20,0,0.8)');
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=grad;pctx.fill();
+  } else if(mode==='police'){
+    const onP=Math.floor(previewTick/10)%2===0;
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=onP?'#ef4444':'#2563eb';pctx.fill();
+  } else if(mode==='candle'){
+    const flick=0.7+Math.random()*0.3;
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=`rgba(255,180,80,${flick})`;pctx.fill();
+  } else if(mode==='chase' || mode==='music'){
+    const grad=pctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,color);grad.addColorStop(1,'#0a0e17');
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=grad;pctx.fill();
+  } else {
+    const grad=pctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,color);grad.addColorStop(1,shade(color,-30));
+    pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.fillStyle=grad;pctx.fill();
+  }
+  pctx.beginPath();pctx.arc(cx,cy,r,0,Math.PI*2);pctx.strokeStyle='#232a3d';pctx.lineWidth=2;pctx.stroke();
+}
+function animate(){ previewTick++; if(!controlView.classList.contains('hidden')) drawPreview(); requestAnimationFrame(animate); }
+animate();
+
+function setBadge(online){
+  const badge = document.getElementById('controlBadge');
+  const text = document.getElementById('controlBadgeText');
+  badge.classList.toggle('online', online);
+  badge.classList.toggle('offline', !online);
+  text.textContent = online ? 'Online' : 'Offline';
+}
+
+function syncUIFromState(online){
+  btnOn.classList.toggle('inactive', !state.power);
+  btnOff.classList.toggle('active', !state.power);
+  brightnessSlider.value = state.brightness;
+  brightnessValue.textContent = state.brightness + '%';
+  brightnessSlider.style.setProperty('--fill', state.brightness + '%');
+  speedSlider.value = state.speed;
+  speedSlider.style.setProperty('--fill', state.speed + '%');
+  hexInput.value = state.color; hexSwatch.value = state.color;
+  modeGrid.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===state.mode));
+  setBadge(online);
+}
+</script>
+</body>
+</html>
