@@ -17,27 +17,42 @@
 
     "devices": {
       "$deviceId": {
-        ".read": "auth != null",
-        ".write": "auth != null && newData.child('ownerUid').val() == auth.uid",
+        ".read": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+        ".write": "auth != null && (
+          (!data.exists() && newData.child('deviceUid').val() == auth.uid) ||
+          (data.child('deviceUid').val() == auth.uid) ||
+          (data.child('ownerUid').val() == auth.uid) ||
+          (newData.child('ownerUid').val() == auth.uid)
+        )",
 
+        "deviceUid": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
         "ownerUid": {
-          ".validate": "newData.isString() && newData.val() == auth.uid"
+          ".validate": "newData.isString() || newData.val() == null"
         },
         "claimCheck": {
           ".validate": "newData.isString() && newData.val().length > 0"
         },
         "meta": {
-          ".validate": "newData.hasChildren(['name'])",
+          ".read": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          ".write": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
           "name": {
             ".validate": "newData.isString() && newData.val().length > 0"
           }
         },
         "state": {
-          ".validate": "newData.hasChildren()"
+          ".read": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          ".write": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          "power": { ".validate": "newData.isBoolean()" },
+          "brightness": { ".validate": "newData.isNumber()" },
+          "color": { ".validate": "newData.isString()" },
+          "mode": { ".validate": "newData.isString()" },
+          "speed": { ".validate": "newData.isNumber()" }
         },
         "command": {
-          ".write": "auth != null && root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid",
-          ".read": "auth != null && root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid"
+          ".read": "auth != null && (root.child('devices').child($deviceId).child('deviceUid').val() == auth.uid || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          ".write": "auth != null && root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid"
         }
       }
     }
