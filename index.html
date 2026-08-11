@@ -48,6 +48,7 @@
   .add-card:hover{border-color:#3a4358;color:var(--text);}
 
   .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal-backdrop.hidden{display:none;}
   .modal{background:var(--panel);border:1px solid var(--panel-border);border-radius:16px;padding:24px;width:90%;max-width:380px;}
 
   .back-link{color:var(--muted);cursor:pointer;font-size:14px;margin-bottom:16px;display:inline-block;}
@@ -255,7 +256,10 @@ const authView = document.getElementById('authView');
 const listView = document.getElementById('listView');
 const controlView = document.getElementById('controlView');
 const addModal = document.getElementById('addModal');
-addModal.classList.add('hidden');
+if (addModal) {
+  addModal.classList.add('hidden');
+  addModal.style.display = 'none';
+}
 function showView(v){ [authView, listView, controlView].forEach(el => el.classList.add('hidden')); v.classList.remove('hidden'); }
 
 function requireAuth() {
@@ -372,7 +376,10 @@ function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<
 
 /* ===================== ADD DEVICE (claim) ===================== */
 window.addEventListener('load', () => {
-  if (addModal) addModal.classList.add('hidden');
+  if (addModal) {
+    addModal.classList.add('hidden');
+    addModal.style.display = 'none';
+  }
   showView(authView);
   console.log('%c[3DLabX Smart Lamp] Auth screen ready. Add-device modal is locked until login. Version: ' + APP_VERSION, 'color:#22c55e;font-weight:700;');
 });
