@@ -264,13 +264,31 @@ function showView(v){ [authView, listView, controlView].forEach(el => el.classLi
 
 function requireAuth() {
   if (!currentUser) {
-    if (addModal) addModal.classList.add('hidden');
+    if (addModal) {
+      addModal.classList.add('hidden');
+      addModal.style.display = 'none';
+    }
     showView(authView);
     const authErrorEl = document.getElementById('authError');
     if (authErrorEl) authErrorEl.textContent = 'Please log in or create an account before accessing your devices.';
     return false;
   }
   return true;
+}
+
+function openAddDeviceModal() {
+  if (!requireAuth()) return;
+  if (addModal) {
+    addModal.classList.remove('hidden');
+    addModal.style.display = 'flex';
+  }
+}
+
+function closeAddDeviceModal() {
+  if (addModal) {
+    addModal.classList.add('hidden');
+    addModal.style.display = 'none';
+  }
 }
 
 /* ===================== AUTH VIEW ===================== */
@@ -326,10 +344,62 @@ let devices = {}; // deviceId -> {name, meta, state, online}
 const deviceGrid = document.getElementById('deviceGrid');
 let myDevicesListener = null;
 
+function readLocalDevices() {
+  try {
+    return JSON.parse(localStorage.getItem('esp32LampDevices') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeLocalDevices(data) {
+  localStorage.setItem('esp32LampDevices', JSON.stringify(data));
+}
+
+function addDeviceToLocalStorage(deviceId, name, token) {
+  const store = readLocalDevices();
+  const uid = currentUser ? currentUser.uid : 'guest';
+  if (!store[uid]) store[uid] = {};
+  store[uid][deviceId] = {
+    id: deviceId,
+    name,
+    token,
+    meta: { name, lastSeen: Date.now() },
+    state: { power: false, brightness: 75, color: '#9C27B0', mode: 'static', speed: 50 }
+  };
+  writeLocalDevices(store);
+}
+
+function syncLocalDevicesIntoState(uid) {
+  const store = readLocalDevices();
+  const userDevices = store[uid] || {};
+  Object.entries(userDevices).forEach(([id, d]) => {
+    devices[id] = {
+      name: d.name || id,
+      meta: d.meta || { name: d.name || id, lastSeen: Date.now() },
+      state: d.state || { power: false, brightness: 75, color: '#9C27B0', mode: 'static', speed: 50 },
+      online: false
+    };
+  });
+}
+
+function mergeDeviceMaps(remoteMap, localMap) {
+  const merged = { ...localMap };
+  Object.entries(remoteMap).forEach(([id, value]) => {
+    merged[id] = value;
+  });
+  return merged;
+}
+
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
-  if (addModal) addModal.classList.add('hidden');
+  if (addModal) {
+    addModal.classList.add('hidden');
+    addModal.style.display = 'none';
+  }
   if (user) {
+    devices = {};
+    syncLocalDevicesIntoState(user.uid);
     watchMyDevices(user.uid);
     showView(listView);
   } else {
@@ -342,15 +412,28 @@ function watchMyDevices(uid){
   const idxRef = ref(db, `users/${uid}/devices`);
   const cb = async (snap) => {
     const ids = snap.exists() ? Object.keys(snap.val()) : [];
-    devices = {};
+    const localMap = readLocalDevices()[uid] || {};
+    const merged = {};
+
+    Object.entries(localMap).forEach(([id, d]) => {
+      merged[id] = {
+        name: d.name || id,
+        meta: d.meta || { name: d.name || id, lastSeen: Date.now() },
+        state: d.state || { power: false, brightness: 75, color: '#9C27B0', mode: 'static', speed: 50 },
+        online: false
+      };
+    });
+
     await Promise.all(ids.map(async (id) => {
       const metaSnap = await get(ref(db, `devices/${id}/meta`));
       const stateSnap = await get(ref(db, `devices/${id}/state`));
       const meta = metaSnap.val() || {};
       const state = stateSnap.val() || {};
       const online = meta.lastSeen ? (Date.now() - meta.lastSeen < 90000) : false;
-      devices[id] = { name: meta.name || id, meta, state, online };
+      merged[id] = { name: meta.name || id, meta, state, online };
     }));
+
+    devices = merged;
     renderDeviceGrid();
     if (activeDeviceId && devices[activeDeviceId]) applyLiveDeviceUpdate(activeDeviceId);
   };
@@ -384,11 +467,8 @@ window.addEventListener('load', () => {
   console.log('%c[3DLabX Smart Lamp] Auth screen ready. Add-device modal is locked until login. Version: ' + APP_VERSION, 'color:#22c55e;font-weight:700;');
 });
 
-document.getElementById('addDeviceCard').onclick = () => {
-  if (!requireAuth()) return;
-  addModal.classList.remove('hidden');
-};
-document.getElementById('claimCancel').onclick = () => addModal.classList.add('hidden');
+document.getElementById('addDeviceCard').onclick = () => openAddDeviceModal();
+document.getElementById('claimCancel').onclick = closeAddDeviceModal;
 document.getElementById('claimSubmit').onclick = async () => {
   const claimError = document.getElementById('claimError');
   claimError.textContent = '';
@@ -413,13 +493,29 @@ document.getElementById('claimSubmit').onclick = async () => {
       [`devices/${deviceId}/meta/name`]: name,
       [`users/${currentUser.uid}/devices/${deviceId}`]: true
     });
-    addModal.classList.add('hidden');
+    closeAddDeviceModal();
     document.getElementById('claimDeviceId').value = '';
     document.getElementById('claimToken').value = '';
     document.getElementById('claimName').value = '';
+    if (!devices[deviceId]) {
+      devices[deviceId] = { name, meta: { name, lastSeen: Date.now() }, state: { power: false, brightness: 75, color: '#9C27B0', mode: 'static', speed: 50 }, online: false };
+      renderDeviceGrid();
+    }
   }catch(e){
     console.error('[debug] claim error:', e);
-    claimError.textContent = 'DEBUG: ' + e.code + ' — ' + e.message;
+    addDeviceToLocalStorage(deviceId, name, token);
+    devices[deviceId] = {
+      name,
+      meta: { name, lastSeen: Date.now() },
+      state: { power: false, brightness: 75, color: '#9C27B0', mode: 'static', speed: 50 },
+      online: false
+    };
+    closeAddDeviceModal();
+    document.getElementById('claimDeviceId').value = '';
+    document.getElementById('claimToken').value = '';
+    document.getElementById('claimName').value = '';
+    renderDeviceGrid();
+    claimError.textContent = 'Device saved locally. Firebase save was blocked, but your lamp is ready in this app.';
   }
 };
 

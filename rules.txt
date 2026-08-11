@@ -1,0 +1,45 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "devices": {
+          "$deviceId": {
+            ".validate": "newData.isBoolean()"
+          }
+        }
+      }
+    },
+
+    "devices": {
+      "$deviceId": {
+        ".read": "auth != null",
+        ".write": "auth != null && newData.child('ownerUid').val() == auth.uid",
+
+        "ownerUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "claimCheck": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "meta": {
+          ".validate": "newData.hasChildren(['name'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          }
+        },
+        "state": {
+          ".validate": "newData.hasChildren()"
+        },
+        "command": {
+          ".write": "auth != null && root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid",
+          ".read": "auth != null && root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid"
+        }
+      }
+    }
+  }
+}
