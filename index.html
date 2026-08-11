@@ -92,9 +92,11 @@
   .preset-swatch{width:44px;height:44px;border-radius:50%;}
   .preset-name{font-size:12.5px;color:var(--muted);text-align:center;}
   .section-gap{margin-bottom:16px;}
+  .debug-badge{position:fixed;top:12px;right:16px;z-index:200;background:rgba(59,130,246,0.12);color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;letter-spacing:0.4px;box-shadow:0 8px 18px rgba(0,0,0,0.2);}
 </style>
 </head>
 <body>
+<div id="debugBadge" class="debug-badge">DEBUG: loading...</div>
 <div class="wrap">
 
   <!-- ============ AUTH VIEW ============ -->
@@ -215,6 +217,12 @@
 </div>
 
 <script type="module">
+const APP_VERSION = '3DLabX-AuthGate-v2026.08.11.2';
+const debugBadge = document.getElementById('debugBadge');
+if (debugBadge) debugBadge.textContent = 'DEBUG: ' + APP_VERSION;
+console.log('%c[3DLabX Smart Lamp] RUNNING VERSION: ' + APP_VERSION, 'color:#5ab0ff;font-weight:700;');
+document.title = '3DLabX Smart Lamp - ' + APP_VERSION;
+
 /* ===================== FIREBASE SETUP ===================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -246,13 +254,16 @@ const db = getDatabase(app);
 const authView = document.getElementById('authView');
 const listView = document.getElementById('listView');
 const controlView = document.getElementById('controlView');
+const addModal = document.getElementById('addModal');
+addModal.classList.add('hidden');
 function showView(v){ [authView, listView, controlView].forEach(el => el.classList.add('hidden')); v.classList.remove('hidden'); }
 
 function requireAuth() {
   if (!currentUser) {
-    addModal.classList.add('hidden');
+    if (addModal) addModal.classList.add('hidden');
     showView(authView);
-    authError.textContent = 'Please log in or create an account before accessing your devices.';
+    const authErrorEl = document.getElementById('authError');
+    if (authErrorEl) authErrorEl.textContent = 'Please log in or create an account before accessing your devices.';
     return false;
   }
   return true;
@@ -313,13 +324,13 @@ let myDevicesListener = null;
 
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
+  if (addModal) addModal.classList.add('hidden');
   if (user) {
     watchMyDevices(user.uid);
     showView(listView);
   } else {
     if (myDevicesListener) { off(myDevicesListener.ref, 'value', myDevicesListener.cb); myDevicesListener = null; }
     devices = {};
-    addModal.classList.add('hidden'); // <-- add this line
     showView(authView);
   }
 });
@@ -360,7 +371,12 @@ function renderDeviceGrid(){
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ===================== ADD DEVICE (claim) ===================== */
-const addModal = document.getElementById('addModal');
+window.addEventListener('load', () => {
+  if (addModal) addModal.classList.add('hidden');
+  showView(authView);
+  console.log('%c[3DLabX Smart Lamp] Auth screen ready. Add-device modal is locked until login. Version: ' + APP_VERSION, 'color:#22c55e;font-weight:700;');
+});
+
 document.getElementById('addDeviceCard').onclick = () => {
   if (!requireAuth()) return;
   addModal.classList.remove('hidden');
