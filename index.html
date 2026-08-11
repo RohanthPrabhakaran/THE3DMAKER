@@ -248,6 +248,16 @@ const listView = document.getElementById('listView');
 const controlView = document.getElementById('controlView');
 function showView(v){ [authView, listView, controlView].forEach(el => el.classList.add('hidden')); v.classList.remove('hidden'); }
 
+function requireAuth() {
+  if (!currentUser) {
+    addModal.classList.add('hidden');
+    showView(authView);
+    authError.textContent = 'Please log in or create an account before accessing your devices.';
+    return false;
+  }
+  return true;
+}
+
 /* ===================== AUTH VIEW ===================== */
 let authMode = 'login';
 const authTitle = document.getElementById('authTitle');
@@ -351,7 +361,10 @@ function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<
 
 /* ===================== ADD DEVICE (claim) ===================== */
 const addModal = document.getElementById('addModal');
-document.getElementById('addDeviceCard').onclick = () => addModal.classList.remove('hidden');
+document.getElementById('addDeviceCard').onclick = () => {
+  if (!requireAuth()) return;
+  addModal.classList.remove('hidden');
+};
 document.getElementById('claimCancel').onclick = () => addModal.classList.add('hidden');
 document.getElementById('claimSubmit').onclick = async () => {
   const claimError = document.getElementById('claimError');
@@ -392,9 +405,14 @@ let activeDeviceId = null;
 let sendTimer = null;
 let state = { power:false, brightness:75, color:'#9C27B0', mode:'static', speed:50 };
 
-document.getElementById('backToList').onclick = () => { activeDeviceId = null; showView(listView); };
+document.getElementById('backToList').onclick = () => {
+  activeDeviceId = null;
+  if (!requireAuth()) return;
+  showView(listView);
+};
 
 function openControl(deviceId){
+  if (!requireAuth()) return;
   activeDeviceId = deviceId;
   applyLiveDeviceUpdate(deviceId);
   showView(controlView);
