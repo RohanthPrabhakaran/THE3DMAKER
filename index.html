@@ -356,6 +356,12 @@ document.getElementById('claimCancel').onclick = () => addModal.classList.add('h
 document.getElementById('claimSubmit').onclick = async () => {
   const claimError = document.getElementById('claimError');
   claimError.textContent = '';
+
+  if (!currentUser) {
+    claimError.textContent = 'You need to be logged in to add a lamp. Please log in first.';
+    return;
+  }
+
   const deviceId = document.getElementById('claimDeviceId').value.trim();
   const token = document.getElementById('claimToken').value.trim();
   const name = document.getElementById('claimName').value.trim() || deviceId;
