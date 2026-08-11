@@ -361,9 +361,10 @@ document.getElementById('claimSubmit').onclick = async () => {
   const name = document.getElementById('claimName').value.trim() || deviceId;
   if (!deviceId || !token) { claimError.textContent = 'Device ID and claim token are required.'; return; }
 
+  console.log('[debug] currentUser:', currentUser);
+  console.log('[debug] deviceId:', deviceId, 'token:', token, 'name:', name);
+
   try{
-    // Single multi-path update: rules validate claimCheck against the stored claimToken
-    // and only allow ownerUid to be set if they match (see database.rules.json).
     await update(ref(db), {
       [`devices/${deviceId}/ownerUid`]: currentUser.uid,
       [`devices/${deviceId}/claimCheck`]: token,
@@ -375,7 +376,8 @@ document.getElementById('claimSubmit').onclick = async () => {
     document.getElementById('claimToken').value = '';
     document.getElementById('claimName').value = '';
   }catch(e){
-    claimError.textContent = 'Could not add this lamp — check the Device ID and token are correct, and that the lamp has connected to the internet at least once.';
+    console.error('[debug] claim error:', e);
+    claimError.textContent = 'DEBUG: ' + e.code + ' — ' + e.message;
   }
 };
 
