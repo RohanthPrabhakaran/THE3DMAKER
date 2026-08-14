@@ -555,9 +555,12 @@ function pushCommand(partial, immediate){
   Object.assign(state, partial);
   clearTimeout(sendTimer);
   const send = async () => {
+    if (!activeDeviceId) { console.warn('[client] pushCommand called but no activeDeviceId'); return; }
     try{
-      await update(ref(db, `devices/${activeDeviceId}/command`), Object.assign({}, partial, { ts: Date.now() }));
-    }catch(e){ /* surfaced via offline badge */ }
+      console.log('[client] sending command', activeDeviceId, partial);
+      await update(ref(db, `devices/${activeDeviceId}/command`), Object.assign({}, partial, { ts: 1 }));
+      console.log('[client] command sent', activeDeviceId, partial);
+    }catch(e){ console.error('[client] command write failed', e); }
   };
   if (immediate) send(); else sendTimer = setTimeout(send, 150);
 }

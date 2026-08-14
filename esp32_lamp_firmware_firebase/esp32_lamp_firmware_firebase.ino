@@ -41,7 +41,7 @@
 #define COLOR_ORDER     GRB
 #define MAX_BRIGHTNESS  255
 
-#define SETUP_BUTTON_PIN 9
+#define SETUP_BUTTON_PIN 4
 #define LONG_PRESS_MS     5000
 #define FACTORY_RESET_MS 10000
 
@@ -428,28 +428,52 @@ bool ensureFirebaseAuth() {
 bool rtdbRequest(const String& method, const String& path, const String& jsonBody, JsonDocument* outDoc) {
   WiFiClientSecure client; client.setInsecure();
   HTTPClient http;
-  String url = String(DATABASE_URL) + path + ".json?auth=" + firebaseIdToken;
-  Serial.println("[trace] rtdb idToken len=" + String(firebaseIdToken.length()));
-  if (!http.begin(client, url)) return false;
-  http.addHeader("Content-Type", "application/json");
+  int attempts = 0;
+  String raw;
+  int code = 0;
+  bool ok = false;
+  while (attempts < 2) {
+    String url = String(DATABASE_URL) + path + ".json?auth=" + firebaseIdToken;
+    Serial.println("[trace] rtdb idToken len=" + String(firebaseIdToken.length()) + " url=" + url);
+    if (!http.begin(client, url)) return false;
+    http.addHeader("Content-Type", "application/json");
 
-  int code;
-  if (method == "GET")        code = http.GET();
-  else if (method == "PUT")   code = http.PUT(jsonBody);
-  else if (method == "PATCH") code = http.PATCH(jsonBody);
-  else { http.end(); return false; }
+    if (method == "GET")        code = http.GET();
+    else if (method == "PUT")   code = http.PUT(jsonBody);
+    else if (method == "PATCH") code = http.PATCH(jsonBody);
+    else { http.end(); return false; }
 
-  bool ok = (code >= 200 && code < 300);
-  String raw = http.getString(); // read once, use for either success parse or error print
-  if (ok && outDoc) {
-    DeserializationError err = deserializeJson(*outDoc, raw);
-    if (err) ok = false;
+    raw = http.getString(); // read once
+    ok = (code >= 200 && code < 300);
+
+    // If we got an auth error, try refreshing the idToken once and retry
+    if (!ok && (code == 401 || code == 403)) {
+      Serial.println("[rtdb] auth error, attempting token refresh...");
+      http.end();
+      if (firebaseRefreshIdToken()) { attempts++; continue; }
+      else return false;
+    }
+
+    // If success and caller wants parsed JSON, try parse
+    if (ok && outDoc) {
+      DeserializationError err = deserializeJson(*outDoc, raw);
+      if (err) {
+        Serial.println("[rtdb] JSON parse failed: " + String(err.c_str()));
+        ok = false;
+      }
+    }
+
+    if (!ok) {
+      Serial.printf("[rtdb] %s %s -> HTTP %d\n", method.c_str(), path.c_str(), code);
+      Serial.println("[rtdb] error body: " + raw);
+    } else {
+      // debug: show raw response for GETs used by command polling
+      Serial.println("[rtdb] response: " + raw);
+    }
+
+    http.end();
+    break;
   }
-  if (!ok) {
-    Serial.printf("[rtdb] %s %s -> HTTP %d\n", method.c_str(), path.c_str(), code);
-    Serial.println("[rtdb] error body: " + raw);
-  }
-  http.end();
   return ok;
 }
 
@@ -506,23 +530,64 @@ void pollCommand() {
   if (!ok || doc.isNull()) return;
 
   unsigned long ts = doc["ts"] | 0UL;
-  if (ts == 0 || ts <= lastAppliedCommandTs) return; // nothing new
-  lastAppliedCommandTs = ts;
+  if (ts == 0) return; // invalid command
+  Serial.println("[command] seen command ts=" + String(ts) + " lastApplied=" + String(lastAppliedCommandTs));
 
   bool changed = false;
-  if (!doc["power"].isNull())      { powerOn = doc["power"].as<bool>(); changed = true; }
-  if (!doc["brightness"].isNull()) { brightness = constrain(doc["brightness"].as<int>(), 0, 100); changed = true; }
-  if (!doc["mode"].isNull())       { modeName = doc["mode"].as<String>(); changed = true; }
-  if (!doc["speed"].isNull())      { speedPct = constrain(doc["speed"].as<int>(), 1, 100); changed = true; }
+  // Apply fields only when they differ from current runtime state. This allows
+  // console edits that update fields but not the ts to still be applied.
+  if (!doc["power"].isNull()) {
+    bool newPower = doc["power"].as<bool>();
+    if (newPower != powerOn) { powerOn = newPower; changed = true; }
+  }
+  if (!doc["brightness"].isNull()) {
+    int newB = constrain(doc["brightness"].as<int>(), 0, 100);
+    if (newB != brightness) { brightness = newB; changed = true; }
+  }
+  if (!doc["mode"].isNull()) {
+    String newMode = doc["mode"].as<String>();
+    if (newMode != modeName) { modeName = newMode; changed = true; }
+  }
+  if (!doc["speed"].isNull()) {
+    int newS = constrain(doc["speed"].as<int>(), 1, 100);
+    if (newS != speedPct) { speedPct = newS; changed = true; }
+  }
   if (!doc["color"].isNull()) {
     String hex = doc["color"].as<String>(); hex.replace("#", "");
     if (hex.length() == 6) {
       long val = strtol(hex.c_str(), NULL, 16);
-      colorR = (val >> 16) & 0xFF; colorG = (val >> 8) & 0xFF; colorB = val & 0xFF;
-      changed = true;
+      uint8_t newR = (val >> 16) & 0xFF;
+      uint8_t newG = (val >> 8) & 0xFF;
+      uint8_t newB = val & 0xFF;
+      if (newR != colorR || newG != colorG || newB != colorB) {
+        colorR = newR; colorG = newG; colorB = newB; changed = true;
+      }
     }
   }
-  if (changed) { applyBrightness(); publishState(); }
+
+  if (changed) {
+    lastAppliedCommandTs = ts;
+    applyBrightness();
+    runLedEffect();
+    FastLED.show();
+
+    Serial.printf(
+        "[LED] power=%d brightness=%d RGB=%02X%02X%02X mode=%s speed=%d\n",
+        powerOn,
+        brightness,
+        colorR,
+        colorG,
+        colorB,
+        modeName.c_str(),
+        speedPct
+    );
+
+    publishState();
+  } else {
+    // No runtime changes — advance lastAppliedCommandTs if this command is newer
+    if (ts > lastAppliedCommandTs) lastAppliedCommandTs = ts;
+    Serial.println("[command] no applicable fields in command");
+  }
 }
 
 // ================================================================
@@ -563,6 +628,17 @@ void setup() {
 
   loadOrCreateIdentity();
   enterState(CHECK_CONFIGURATION);
+
+  powerOn = true;
+brightness = 100;
+colorR = 255;
+colorG = 0;
+colorB = 0;
+modeName = "static";
+
+applyBrightness();
+runLedEffect();
+FastLED.show();
 }
 
 void loop() {
@@ -573,17 +649,19 @@ void loop() {
     case BOOT:
       enterState(CHECK_CONFIGURATION); break;
 
-    case CHECK_CONFIGURATION:
-      if (wifiConfigured) {
-        WiFi.mode(WIFI_STA);
-        WiFi.setSleep(false);   // <-- disable modem sleep, fixes most intermittent drops
-        WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
-        lastWifiAttempt = now;
-        enterState(WIFI_CONNECTING);
-      } else {
-        startProvisioning();
-      }
-      break;
+  case CHECK_CONFIGURATION:
+  if (wifiConfigured) {
+    WiFi.disconnect(true, true);   // clean teardown before every (re)connect attempt
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);          // disable modem sleep, fixes most intermittent drops
+    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
+    lastWifiAttempt = now;
+    enterState(WIFI_CONNECTING);
+  } else {
+    startProvisioning();
+  }
+  break;
 
     case PROVISIONING:
       dnsServer.processNextRequest();
